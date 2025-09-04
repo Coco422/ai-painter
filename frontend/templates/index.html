@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Painter - AI绘画工具</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部导航 -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1><i class="fas fa-paint-brush"></i> AI Painter</h1>
+            </div>
+            <div class="nav-content">
+                <!-- 用户信息 -->
+                <div id="userInfo" class="user-info" style="display: none;">
+                    <span id="currentUsername"></span>
+                    <span class="points-display">积分: <span id="userPoints">0</span></span>
+                    <button class="btn btn-outline btn-sm" onclick="showRedeemModal()">
+                        <i class="fas fa-gift"></i> 兑换积分
+                    </button>
+                    <a id="adminLink" href="/admin" style="display: none;" class="btn btn-outline btn-sm">
+                        <i class="fas fa-cog"></i> 管理面板
+                    </a>
+                    <button class="btn btn-outline btn-sm" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> 退出
+                    </button>
+                </div>
+
+                <!-- 登录注册按钮 -->
+                <div id="authButtons" class="auth-buttons">
+                    <button class="btn btn-outline" onclick="showLoginModal()">
+                        <i class="fas fa-sign-in-alt"></i> 登录
+                    </button>
+                    <button class="btn btn-primary" onclick="showRegisterModal()">
+                        <i class="fas fa-user-plus"></i> 注册
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容区域 -->
+        <div class="main-content">
+            <!-- 左侧：提示引擎 -->
+            <div class="panel prompt-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-lightbulb"></i> 提示引擎</h3>
+                </div>
+                <div class="panel-body">
+                    <!-- 登录提示 -->
+                    <div id="loginPrompt" class="login-prompt">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <p>请先登录以使用AI绘画功能</p>
+                        <button class="btn btn-primary" onclick="showLoginModal()">立即登录</button>
+                    </div>
+
+                    <!-- 生图表单 -->
+                    <div id="generationForm" style="display: none;">
+                        <!-- 模式切换 -->
+                        <div class="mode-section">
+                            <div class="mode-tabs">
+                                <button class="mode-tab active" data-mode="text2img" onclick="switchMode('text2img')">
+                                    <i class="fas fa-font"></i>
+                                    <span>文生图</span>
+                                </button>
+                                <button class="mode-tab" data-mode="img2img" onclick="switchMode('img2img')">
+                                    <i class="fas fa-image"></i>
+                                    <span>图生图</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 提示词优化开关（精简版） -->
+                        <div class="optimizer-compact">
+                            <label class="checkbox-wrapper-inline" title="优化策略与模型由管理员在后台配置">
+                                <input type="checkbox" id="enableOptimization" checked>
+                                <span class="checkmark-small"></span>
+                                <span class="optimizer-text">
+                                    <i class="fas fa-magic"></i> 
+                                    <span>启用提示词优化</span>
+                                    <small>(+1积分)</small>
+                                </span>
+                            </label>
+                        </div>
+
+                        <!-- 文生图模式 -->
+                        <div id="text2imgMode" class="generation-mode active">
+                            <div class="generation-section">
+                                <h4><i class="fas fa-paint-brush"></i> 绘画参数</h4>
+                                <div class="form-group">
+                                    <label for="prompt">绘画提示词</label>
+                                    <textarea id="prompt" placeholder="描述您想要生成的图片..." rows="3"></textarea>
+                                </div>
+
+                                <!-- 提示词优化开关已上移到通用优化区 -->
+                            </div>
+                        </div>
+
+                        <!-- 图生图模式 -->
+                        <div id="img2imgMode" class="generation-mode" style="display: none;">
+                            <div class="upload-section">
+                                <label for="imageFile" class="upload-area">
+                                    <div class="upload-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <div id="uploadText" class="upload-text">
+                                        <span class="upload-title">选择参考图片</span>
+                                        <span class="upload-subtitle">拖拽图片到此处，或点击选择文件</span>
+                                        <span class="upload-info">支持 JPG, PNG, GIF 格式，最大 10MB</span>
+                                    </div>
+                                    <input type="file" id="imageFile" accept="image/*" style="display: none;">
+                                </label>
+                                <div id="imagePreview" class="image-preview" style="display: none;"></div>
+                            </div>
+
+                            <div class="generation-section">
+                                <div class="form-group">
+                                    <label for="img2imgPrompt">图片修改描述</label>
+                                    <textarea id="img2imgPrompt" placeholder="描述您想要如何修改这张图片..." rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 预设提示词 -->
+                        <div class="preset-prompts-section">
+                            <h4><i class="fas fa-star"></i> 预设提示词</h4>
+                            <div class="preset-prompts-container">
+                                <div class="preset-prompts-scroll" id="presetPromptsScroll">
+                                    <!-- 预设提示词卡片将通过JS动态加载 -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 通用参数 -->
+                        <div class="common-params">
+                            <div class="form-group">
+                                <label for="models">绘画模型（可多选）</label>
+                                <select id="models" multiple size="4">
+                                    <option value="gpt-4o-image">gpt-4o-image</option>
+                                    <option value="imagen-4.0-ultra-generate-preview-06-06">imagen-4.0-ultra-generate-preview-06-06</option>
+                                    <option value="imagen-4.0-generate-preview-06-06">imagen-4.0-generate-preview-06-06</option>
+                                    <option value="gemini-2.5-flash-image-preview">gemini-2.5-flash-image-preview</option>
+                                    <option value="__custom__">自定义...</option>
+                                </select>
+                                <input type="text" id="customModelInput" placeholder="请输入自定义模型名称" style="display:none; margin-top:8px;">
+                                <small style="color:#6c757d;">按 Ctrl/Command 键进行多选；选择"自定义..."可手动输入模型名称</small>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="size">尺寸</label>
+                                    <select id="size">
+                                        <option value="1024x1024">1024x1024 (正方形)</option>
+                                        <option value="1024x1792">1024x1792 (竖屏)</option>
+                                        <option value="1792x1024">1792x1024 (横屏)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="format">输出格式</label>
+                                    <select id="format">
+                                        <option value="png">PNG</option>
+                                        <option value="jpg">JPG</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary btn-full" onclick="generateImage()" id="generateBtn">
+                                <i class="fas fa-paint-brush"></i> 生成图片
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：输出画廊 -->
+            <div class="panel gallery-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-images"></i> 输出画廊</h3>
+                </div>
+                <div class="panel-body">
+                    <!-- 生成状态 -->
+                    <div id="generationStatus" class="status-card" style="display: none;">
+                        <div class="status-spinner">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                        <p id="statusText">正在生成图片...</p>
+                    </div>
+
+                    <!-- 结果显示区域 -->
+                    <div id="resultsArea" class="results-area">
+                        <div class="empty-state">
+                            <i class="fas fa-image"></i>
+                            <p>您的作品将在这里展示</p>
+                        </div>
+                    </div>
+
+                    <!-- 模式指示器 -->
+                    <div id="modeIndicator" class="mode-indicator">
+                        当前模式: <span id="currentMode">文生图</span>
+                    </div>
+
+                    <!-- 加载提示面板 -->
+                    <div class="loading-tips-section">
+                        <div class="loading-tips-header">
+                            <h5><i class="fas fa-lightbulb"></i> 小贴士</h5>
+                        </div>
+                        <div id="loadingTips" class="loading-tips-panel">
+                            <div class="tip-content">
+                                <i class="fas fa-info-circle tip-icon"></i>
+                                <span class="tip-text">点击生成按钮开始创作您的艺术作品</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部：历史记录 -->
+        <div class="history-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-history"></i> 历史记录</h3>
+                    <div class="history-actions">
+                        <button class="btn btn-outline btn-sm" onclick="deleteSelectedHistory()">
+                            <i class="fas fa-trash"></i> 删除选中
+                        </button>
+                        <button class="btn btn-outline btn-sm" onclick="clearHistory()">
+                            <i class="fas fa-eraser"></i> 清空全部
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div id="historyGrid" class="history-grid">
+                        <div class="empty-state">
+                            <i class="fas fa-clock"></i>
+                            <p>暂无历史记录</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 登录模态框 -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>用户登录</h3>
+                <span class="close" onclick="closeModal('loginModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="loginUsername">用户名</label>
+                        <input type="text" id="loginUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">密码</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">登录</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 注册模态框 -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>用户注册</h3>
+                <span class="close" onclick="closeModal('registerModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="registerForm" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label for="registerUsername">用户名</label>
+                        <input type="text" id="registerUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">密码</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerInviteCode">邀请码</label>
+                        <input type="text" id="registerInviteCode" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">注册</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 兑换码模态框 -->
+    <div id="redeemModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>兑换积分</h3>
+                <span class="close" onclick="closeModal('redeemModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="redeemForm" onsubmit="handleRedeem(event)">
+                    <div class="form-group">
+                        <label for="redeemCode">兑换码</label>
+                        <input type="text" id="redeemCode" placeholder="请输入兑换码" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">兑换</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预设提示词详情模态框 -->
+    <div id="presetPromptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-star"></i> 预设提示词</h3>
+                <span class="close" onclick="closeModal('presetPromptModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="preset-prompt-detail">
+                    <div class="preset-prompt-image" id="presetPromptImage">
+                        <img id="presetPromptImg" src="" alt="示例图片" style="display: none;">
+                        <div class="no-image" id="presetPromptNoImage" style="display: none;">
+                            <i class="fas fa-image"></i>
+                            <p>无示例图片</p>
+                        </div>
+                    </div>
+                    <div class="preset-prompt-info">
+                        <h4 id="presetPromptTitle">提示词内容</h4>
+                        <div class="preset-prompt-content" id="presetPromptContent">
+                            <!-- 提示词内容将在这里显示 -->
+                        </div>
+                        <div class="preset-prompt-meta">
+                            <span class="preset-prompt-type" id="presetPromptType"></span>
+                            <span class="preset-prompt-source" id="presetPromptSource"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary btn-full" onclick="usePresetPrompt()">
+                        <i class="fas fa-plus"></i> 使用此提示词
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast通知 -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 管理员面板 - AI Painter</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* 管理员页面样式 */
+        .form-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .table-section {
+            margin-top: 2rem;
+        }
+
+        .admin-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.used {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-badge.unused {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert code {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        @media (max-width: 768px) {
+            .data-table {
+                font-size: 0.875rem;
+            }
+
+            .data-table th,
+            .data-table td {
+                padding: 0.5rem;
+            }
+
+                    .nav-actions {
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+            .nav-actions .btn {
+                min-width: auto;
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-cog"></i>
+                <span>管理员面板</span>
+            </div>
+            <div class="nav-actions">
+                <button class="btn btn-outline btn-sm" onclick="window.location.href='/'">
+                    <i class="fas fa-home"></i> 返回主页
+                </button>
+                <span id="adminUsername"></span>
+                <button class="btn btn-primary btn-sm" onclick="generateInviteCode()">
+                    <i class="fas fa-plus"></i> 生成邀请码
+                </button>
+                <button class="btn btn-success btn-sm" onclick="generateRedeemCode()">
+                    <i class="fas fa-gift"></i> 生成兑换码
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="logout()">退出</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="admin-content">
+            <!-- 用户管理 -->
+            <div class="admin-section">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-users"></i> 用户管理</h3>
+                        <button class="btn btn-primary btn-sm" onclick="loadUsers()">
+                            <i class="fas fa-sync"></i> 刷新
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div id="usersTable" class="admin-table">
+                            <div class="loading-state">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <p>加载用户列表...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 兑换码管理 -->
+            <div class="admin-section">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-gift"></i> 兑换码管理</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-section">
+                            <h4><i class="fas fa-list"></i> 管理操作</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <button class="btn btn-primary" onclick="loadInviteCodes()">
+                                        <i class="fas fa-sync"></i> 刷新邀请码
+                                    </button>
+                                </div>
+                                <div class="form-group">
+                                    <button class="btn btn-success" onclick="loadCodes()">
+                                        <i class="fas fa-sync"></i> 刷新兑换码
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 邀请码列表 -->
+                        <div class="table-section">
+                            <h4><i class="fas fa-ticket-alt"></i> 邀请码列表</h4>
+                            <div id="inviteCodesTable" class="admin-table">
+                                <div class="empty-state">
+                                    <i class="fas fa-ticket-alt"></i>
+                                    <p>暂无邀请码</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 兑换码列表 -->
+                        <div class="table-section">
+                            <h4><i class="fas fa-gift"></i> 兑换码列表</h4>
+                            <div id="codesTable" class="admin-table">
+                                <div class="empty-state">
+                                    <i class="fas fa-gift"></i>
+                                    <p>暂无兑换码</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API配置管理 -->
+            <div class="admin-section">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-cog"></i> API配置管理</h3>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-section">
+                            <h4><i class="fas fa-list"></i> 管理操作</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <button class="btn btn-primary" onclick="loadApiConfigs()">
+                                        <i class="fas fa-sync"></i> 刷新配置
+                                    </button>
+                                </div>
+                                <div class="form-group">
+                                    <button class="btn btn-success" onclick="createApiConfig()">
+                                        <i class="fas fa-plus"></i> 新建配置
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API配置列表 -->
+                        <div class="table-section">
+                            <h4><i class="fas fa-server"></i> API配置列表</h4>
+                            <div id="apiConfigsTable" class="admin-table">
+                                <div class="empty-state">
+                                    <i class="fas fa-cog"></i>
+                                    <p>暂无API配置</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 预设提示词管理 -->
+            <div class="admin-section">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-star"></i> 预设提示词管理</h3>
+                        <button class="btn btn-primary btn-sm" onclick="showCreatePresetPromptModal()">
+                            <i class="fas fa-plus"></i> 添加提示词
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-section">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="presetPromptTypeFilter">类型过滤</label>
+                                    <select id="presetPromptTypeFilter" onchange="loadPresetPrompts()">
+                                        <option value="">全部类型</option>
+                                        <option value="text2img">文生图</option>
+                                        <option value="img2img">图生图</option>
+                                        <option value="both">通用</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <button class="btn btn-secondary" onclick="loadPresetPrompts()">
+                                        <i class="fas fa-sync"></i> 刷新列表
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 预设提示词列表 -->
+                        <div class="table-section">
+                            <h4><i class="fas fa-list"></i> 预设提示词列表</h4>
+                            <div id="presetPromptsTable" class="admin-table">
+                                <div class="empty-state">
+                                    <i class="fas fa-star"></i>
+                                    <p>暂无预设提示词</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统统计 -->
+            <div class="admin-section">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-chart-bar"></i> 系统统计</h3>
+                        <button class="btn btn-outline btn-sm" onclick="loadStats()">
+                            <i class="fas fa-sync"></i> 刷新
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div id="statsGrid" class="stats-grid">
+                            <div class="stat-card">
+                                <i class="fas fa-users"></i>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="totalUsers">-</div>
+                                    <div class="stat-label">总用户数</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-image"></i>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="totalGenerations">-</div>
+                                    <div class="stat-label">总生成次数</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-coins"></i>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="totalPoints">-</div>
+                                    <div class="stat-label">总积分发放</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-clock"></i>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="activeUsers">-</div>
+                                    <div class="stat-label">活跃用户</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑用户模态框 -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-user-edit"></i> 编辑用户</h4>
+                <button class="modal-close" onclick="closeModal('editUserModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <div class="form-group">
+                        <label for="editUsername">用户名</label>
+                        <input type="text" id="editUsername" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPoints">积分</label>
+                        <input type="number" id="editPoints" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="editIsActive">激活状态</label>
+                        <select id="editIsActive">
+                            <option value="true">激活</option>
+                            <option value="false">禁用</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('editUserModal')">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速生成邀请码模态框 -->
+    <div id="quickInviteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-ticket-alt"></i> 生成邀请码</h4>
+                <button class="modal-close" onclick="closeModal('quickInviteModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="quickInviteForm">
+                    <div class="form-group">
+                        <label for="quickInviteExpiry">过期时间 (可选)</label>
+                        <input type="datetime-local" id="quickInviteExpiry">
+                        <small style="color:#6c757d;">留空表示永久有效</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">生成邀请码</button>
+                    </div>
+                </form>
+                <div id="inviteCodeResult" style="display: none; margin-top: 1rem;">
+                    <div class="alert alert-success">
+                        <strong>邀请码生成成功！</strong><br>
+                        <code id="generatedInviteCode" style="font-size: 1.2rem; color: #007bff;"></code><br>
+                        <small style="color:#6c757d;">请复制保存，此码不会再次显示</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 生成兑换码模态框 -->
+
+    <!-- 创建API配置模态框 -->
+    <div id="createApiConfigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-cog"></i> 创建API配置</h4>
+                <button class="modal-close" onclick="closeModal('createApiConfigModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createApiConfigForm">
+                    <div class="form-group">
+                        <label for="configKey">配置名称</label>
+                        <input type="text" id="configKey" placeholder="如: openai, default" required>
+                        <small style="color:#6c757d;">配置的唯一标识符</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="apiKey">API Key</label>
+                        <input type="password" id="apiKey" placeholder="输入API Key" required>
+                        <small style="color:#6c757d;">OpenAI或其他AI服务的API密钥</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="apiBaseUrl">API Base URL</label>
+                        <input type="text" id="apiBaseUrl" value="https://api.openai.com" required>
+                        <small style="color:#6c757d;">API服务的基础URL</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="configOptimizerModel">优化器模型</label>
+                        <input type="text" id="configOptimizerModel" value="gpt-4o-mini" placeholder="如: gpt-4o-mini">
+                        <small style="color:#6c757d;">用于提示词优化的AI模型</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="configSystemPrompt">系统提示词</label>
+                        <textarea id="configSystemPrompt" placeholder="系统提示词..." rows="3">你是一个专业的AI绘画提示词优化专家。请将用户输入的中文描述优化并翻译成高质量的英文绘画提示词。要求：1.保持原意不变 2.增加艺术性描述 3.使用专业绘画术语 4.直接返回优化后的英文提示词，不要解释过程</textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('createApiConfigModal')">取消</button>
+                        <button type="submit" class="btn btn-success">创建配置</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑API配置模态框 -->
+    <div id="editApiConfigModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-edit"></i> 编辑API配置</h4>
+                <button class="modal-close" onclick="closeModal('editApiConfigModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editApiConfigForm">
+                    <div class="form-group">
+                        <label>配置名称</label>
+                        <input type="text" id="editConfigKey" readonly>
+                        <small style="color:#6c757d;">配置名称不可修改</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="editApiKey">API Key</label>
+                        <input type="password" id="editApiKey" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editApiBaseUrl">API Base URL</label>
+                        <input type="text" id="editApiBaseUrl" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editOptimizerModel">优化器模型</label>
+                        <input type="text" id="editOptimizerModel">
+                    </div>
+                    <div class="form-group">
+                        <label for="editSystemPrompt">系统提示词</label>
+                        <textarea id="editSystemPrompt" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="editIsActive">激活状态</label>
+                        <select id="editIsActive">
+                            <option value="true">激活</option>
+                            <option value="false">禁用</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('editApiConfigModal')">取消</button>
+                        <button type="submit" class="btn btn-primary">保存更改</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 生成兑换码模态框 -->
+    <div id="generateCodeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-gift"></i> 生成兑换码</h4>
+                <button class="modal-close" onclick="closeModal('generateCodeModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="generateCodeForm">
+                    <div class="form-group">
+                        <label for="modalCodePoints">积分数量</label>
+                        <input type="number" id="modalCodePoints" value="10" min="1" max="1000" required>
+                        <small style="color:#6c757d;">兑换码包含的积分数量 (1-1000)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="modalCodeExpiry">过期时间 (可选)</label>
+                        <input type="datetime-local" id="modalCodeExpiry">
+                        <small style="color:#6c757d;">留空表示永久有效</small>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('generateCodeModal')">取消</button>
+                        <button type="submit" class="btn btn-success">生成兑换码</button>
+                    </div>
+                </form>
+                <div id="redeemCodeResult" style="display: none; margin-top: 1rem;">
+                    <div class="alert alert-success">
+                        <strong>兑换码生成成功！</strong><br>
+                        <code id="generatedRedeemCode" style="font-size: 1.2rem; color: #28a745;"></code><br>
+                        <small style="color:#6c757d;">请复制保存，此码不会再次显示</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建预设提示词模态框 -->
+    <div id="createPresetPromptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-star"></i> 创建预设提示词</h4>
+                <button class="modal-close" onclick="closeModal('createPresetPromptModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createPresetPromptForm" onsubmit="handleCreatePresetPrompt(event)">
+                    <div class="form-group">
+                        <label for="newPromptContent">提示词内容 *</label>
+                        <textarea id="newPromptContent" rows="4" placeholder="输入提示词内容..." required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPromptType">提示词类型 *</label>
+                        <select id="newPromptType" required>
+                            <option value="">请选择类型</option>
+                            <option value="text2img">文生图</option>
+                            <option value="img2img">图生图</option>
+                            <option value="both">通用</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPromptSource">提示词来源</label>
+                        <input type="text" id="newPromptSource" placeholder="输入来源信息（可选）">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPromptImage">示例图片URL</label>
+                        <input type="url" id="newPromptImage" placeholder="输入示例图片URL（可选）">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('createPresetPromptModal')">取消</button>
+                        <button type="submit" class="btn btn-primary">创建</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑预设提示词模态框 -->
+    <div id="editPresetPromptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4><i class="fas fa-edit"></i> 编辑预设提示词</h4>
+                <button class="modal-close" onclick="closeModal('editPresetPromptModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editPresetPromptForm" onsubmit="handleEditPresetPrompt(event)">
+                    <input type="hidden" id="editPromptId">
+                    <div class="form-group">
+                        <label for="editPromptContent">提示词内容 *</label>
+                        <textarea id="editPromptContent" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPromptType">提示词类型 *</label>
+                        <select id="editPromptType" required>
+                            <option value="text2img">文生图</option>
+                            <option value="img2img">图生图</option>
+                            <option value="both">通用</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editPromptSource">提示词来源</label>
+                        <input type="text" id="editPromptSource">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPromptImage">示例图片URL</label>
+                        <input type="url" id="editPromptImage">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-wrapper">
+                            <input type="checkbox" id="editPromptActive">
+                            <span class="checkmark"></span>
+                            是否激活
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('editPresetPromptModal')">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div id="messageToast" class="toast" style="display: none;">
+        <i class="fas fa-info-circle"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>
